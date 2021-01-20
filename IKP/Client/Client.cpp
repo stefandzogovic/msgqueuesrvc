@@ -45,7 +45,15 @@ int __cdecl main(int argc, char** argv)
 	}
 
 	iResult = recv(connectSocket, buffer, DEFAULT_BUFLEN, 0);
-	printf(buffer);
+	char delim[] = ",";
+	char* ptr = strtok(buffer, delim);
+	int brojac = 1;
+	while (ptr != NULL)
+	{
+		printf("%d. %s\n", brojac, ptr);
+		ptr = strtok(NULL, delim);
+		brojac++;
+	}
 
 	printf("Choose commoncuation channel: \n");
 	char returnstring[1000];

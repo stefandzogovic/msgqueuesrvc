@@ -14,6 +14,9 @@ int main()
 
 	extern CRITICAL_SECTION cs;
 	extern List* lista;
+	char c[] = "c string";
+	queuepair *qpr = queuePairCreate(c);
+	ListAdd(123, qpr, &lista);
 	int iResult;
 
 	int id = 0;
@@ -127,7 +130,7 @@ int main()
 			//memcpy(idservisasend, &(idservisatemp), 4);
 			iResult = send(acceptedSocket, queuepairnames, strlen(queuepairnames), 0);
 			//*param = idservisa;
-			hThread2 = CreateThread(NULL, 0, &ServerCommunicateThread, param, 0, &dw2);
+			hThread2 = CreateThread(NULL, 0, &ClientChooseQueuePair, 0, 0, &dw2);
 			//ListAdd(idservisa, acceptedSocket, dw2, hThread2, &listservicehead);
 
 			//idservisa++;

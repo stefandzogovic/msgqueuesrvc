@@ -1,7 +1,7 @@
 #include "Header.h"
 
 CRITICAL_SECTION cs; //Globalna promenljiva, kriticna sekcija
-List* lista; //lista za paroveredova
+List* lista = NULL; //lista za paroveredova
 
 bool InitializeWindowsSockets()
 {
@@ -45,6 +45,23 @@ struct queuepair* queuePairCreate()
 	q->handle = 0;
 	return q;
 }
+
+struct queuepair* queuePairCreate(char* naziv)
+{
+
+	struct queuepair* q;
+
+	q = (queuepair*)malloc(sizeof(struct queuepair));
+
+	q->nazivreda = naziv;
+	q->idclienta = 0;
+	q->shutdown = 0;
+	q->queuerecvfromserv = NULL;
+	q->queuesendtoserv = NULL;
+	q->handle = 0;
+	return q;
+}
+
 
 /* add a new value to back of queue */
 void enq(struct queue* q, char* value)
@@ -151,16 +168,38 @@ void queuepairDestroy(struct queuepair* q)
 	ili njegovo postavljanje na pocetak liste.
 	Soket za komunikaciju se koristi da bi proksi znao kojem klijentu/serveru prosledjuje poruke.
 */
-void ListAdd(int number, SOCKET s, DWORD id, HANDLE h, List** head)
+//void ListAdd(int number, SOCKET s, DWORD id, HANDLE h, List** head)
+//{
+//	List* el;
+//	el = (List*)malloc(sizeof(List));
+//	el->num = number;
+//	el->s = s;
+//	el->threadID = id;
+//	el->clienth = h;
+//	el->next = NULL;
+//	el->brojizabranihservisa = 0;
+//	if (*head == NULL) {
+//		*head = el;
+//	}
+//	else {
+//		List* temp = *head;
+//		while (temp->next != NULL) {
+//			temp = temp->next;
+//		}
+//		temp->next = el;
+//	}
+//}
+
+void ListAdd(int number, queuepair* qpr, List** head)
 {
 	List* el;
 	el = (List*)malloc(sizeof(List));
 	el->num = number;
-	el->s = s;
-	el->threadID = id;
-	el->clienth = h;
+	//el->s = s;
+	//el->threadID = id;
+	//el->clienth = h;
 	el->next = NULL;
-	el->brojizabranihservisa = 0;
+	el->queuepair = qpr;
 	if (*head == NULL) {
 		*head = el;
 	}
@@ -189,22 +228,26 @@ int ListCount(List* head)
 char* GetQueuePairNames(List* head)
 {
 	List* temp = head;
-	char* buffer = (char*)malloc(sizeof(temp->queuepair->nazivreda));
-	buffer = temp->queuepair->nazivreda;
-	int ret = 0;
-	while (temp) {
-		ret++;
-		temp = temp->next;
-		char *_New_Buf = (char*)realloc(buffer, sizeof(temp->queuepair->nazivreda));
-		char x = ',';
-		if (_New_Buf != NULL)
-			buffer = _New_Buf;
-		else
-		{
+	if (temp != NULL)
+	{
+		char* buffer = (char*)malloc(sizeof(temp->queuepair->nazivreda));
+		buffer = temp->queuepair->nazivreda;
+		char x[2] = ",";
+
+		buffer = strcat(buffer, x);
+		printf(buffer);
+		while (temp->next != NULL) {
+
+			temp = temp->next;
+			char* _New_Buf = (char*)realloc(buffer, sizeof(temp->queuepair->nazivreda));
+			//_New_Buf = (char*)realloc(_New_Buf, 1);
+			if (_New_Buf != NULL)
+				buffer = _New_Buf;
 
 		}
+		return buffer;
 	}
-	return buffer;
+	return NULL;
 }
 
 /*
@@ -258,6 +301,12 @@ void Select(SOCKET socket, bool read) {
 	}
 }
 
+DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
+{
+
+}
+
+
 DWORD WINAPI ServerCommunicateThread(LPVOID lpParam)
 {
 	int iResult = 0;
@@ -284,7 +333,7 @@ DWORD WINAPI ServerCommunicateThread(LPVOID lpParam)
 	//				List* client = ListElementAt(idklijenta, listclienthead);
 	//				if (client->ready == 1)
 	//				{
-	//					for (int j = 0; j < client->brojizabranihservisa; j++)
+	//					for (int j = 0; j < client->brojizabranihservisa; j++)	
 	//					{
 	//						if (client->drajver->pokazivaci[j]->idservisa == servis->num)
 	//						{
