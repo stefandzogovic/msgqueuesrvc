@@ -56,22 +56,30 @@ int __cdecl main(int argc, char** argv)
 	}
 
 	printf("Choose commoncuation channel: \n");
-	char returnstring[1000];
-	scanf("%s", returnstring);
-   	//izabraniservisizaconnect = Menu(connectSocket, buffer);
+	char string[1000] = "";
+	(void)scanf("%s", string);
 
-	//Connect(connectSocket, izabraniservisizaconnect);
+	iResult = send(connectSocket, string, strlen(string), 0);
+
 
 	unsigned long int nonBlockingMode = 1;
 	iResult = ioctlsocket(connectSocket, FIONBIO, &nonBlockingMode);
 
-	//HANDLE h1;
-	//DWORD dw1;
-	//h1 = CreateThread(NULL, 0, &ClientSendData, NULL, 0, &dw1);
-	//// Send an prepared message with null terminator included
-	//scanf("%d", &i);
+   	//izabraniservisizaconnect = Menu(connectSocket, buffer);
 
-	// cleanup
+	//Connect(connectSocket, izabraniservisizaconnect);
+
+
+	HANDLE h1;
+	DWORD dw1;
+	//ThreadParams* p = (ThreadParams*)malloc(sizeof(ThreadParams));
+	//p->clientsocket = connectSocket;
+	h1 = CreateThread(NULL, 0, &ClientSendData, NULL, 0, &dw1);
+
+	while (true)
+	{
+
+	}
 	shutdown(connectSocket, SD_RECEIVE);
 	closesocket(connectSocket);
 	WSACleanup();

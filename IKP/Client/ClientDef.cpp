@@ -33,3 +33,16 @@ void Connect(SOCKET connectSocket, char* izabraniservisi)
 	//}
 	//Sleep(1000);
 }
+
+DWORD WINAPI ClientSendData(LPVOID lpParam)
+{
+	char inputText[30];
+	int iResult = 0;
+	while (true)
+	{
+		printf("Send something: ");
+		(void)scanf("%s", inputText);
+		iResult = send(connectSocket, inputText, strnlen_s(inputText, sizeof(inputText)), 0);
+
+	}
+}

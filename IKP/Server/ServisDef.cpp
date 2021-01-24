@@ -23,7 +23,6 @@ struct queue* queueCreate()
 	q = (queue*)malloc(sizeof(struct queue));
 
 	q->head = q->tail = 0;
-
 	return q;
 }
 /*
@@ -56,8 +55,8 @@ struct queuepair* queuePairCreate(char* naziv)
 	q->nazivreda = naziv;
 	q->idclienta = 0;
 	q->shutdown = 0;
-	q->queuerecvfromserv = NULL;
-	q->queuesendtoserv = NULL;
+	q->queuerecvfromserv = queueCreate();
+	q->queuesendtoserv = queueCreate();
 	q->handle = 0;
 	return q;
 }
@@ -168,38 +167,19 @@ void queuepairDestroy(struct queuepair* q)
 	ili njegovo postavljanje na pocetak liste.
 	Soket za komunikaciju se koristi da bi proksi znao kojem klijentu/serveru prosledjuje poruke.
 */
-//void ListAdd(int number, SOCKET s, DWORD id, HANDLE h, List** head)
-//{
-//	List* el;
-//	el = (List*)malloc(sizeof(List));
-//	el->num = number;
-//	el->s = s;
-//	el->threadID = id;
-//	el->clienth = h;
-//	el->next = NULL;
-//	el->brojizabranihservisa = 0;
-//	if (*head == NULL) {
-//		*head = el;
-//	}
-//	else {
-//		List* temp = *head;
-//		while (temp->next != NULL) {
-//			temp = temp->next;
-//		}
-//		temp->next = el;
-//	}
-//}
-
-void ListAdd(int number, queuepair* qpr, List** head)
+void ListAdd(char *c, SOCKET s, DWORD id, HANDLE h, List** head)
 {
 	List* el;
 	el = (List*)malloc(sizeof(List));
-	el->num = number;
-	//el->s = s;
-	//el->threadID = id;
-	//el->clienth = h;
-	el->next = NULL;
+	el->num = 0;
+	queuepair* qpr = queuePairCreate(c);
+
+	el->s = s;
+	el->threadID = id;
 	el->queuepair = qpr;
+	el->clienth = h;
+	el->next = NULL;
+
 	if (*head == NULL) {
 		*head = el;
 	}
@@ -211,6 +191,29 @@ void ListAdd(int number, queuepair* qpr, List** head)
 		temp->next = el;
 	}
 }
+
+//void ListAdd(int number, queuepair* qpr, List** head)
+//{
+//	List* el;
+//	el = (List*)malloc(sizeof(List));
+//	//el->num = number;
+//	//el->s = s;
+//	//el->threadID = id;
+//	//el->clienth = h;
+//	el->next = NULL;
+//	el->ready = 0;
+//	el->queuepair = qpr;
+//	if (*head == NULL) {
+//		*head = el;
+//	}
+//	else {
+//		List* temp = *head;
+//		while (temp->next != NULL) {
+//			temp = temp->next;
+//		}
+//		temp->next = el;
+//	}
+//}
 /*
 	Funkcija vraca koliko postoji elemanata u odgovarajucoj listi (parametar pokazuje koja je lista u pitanju).
 */
@@ -235,7 +238,7 @@ char* GetQueuePairNames(List* head)
 		char x[2] = ",";
 
 		buffer = strcat(buffer, x);
-		printf(buffer);
+		//printf(buffer);
 		while (temp->next != NULL) {
 
 			temp = temp->next;
@@ -243,7 +246,6 @@ char* GetQueuePairNames(List* head)
 			//_New_Buf = (char*)realloc(_New_Buf, 1);
 			if (_New_Buf != NULL)
 				buffer = _New_Buf;
-
 		}
 		return buffer;
 	}
@@ -256,18 +258,25 @@ char* GetQueuePairNames(List* head)
 	Funkcija se koristi za pristupanje elementima liste. U slucaju da elemenat nije pronadjen, vraca NULL; ukoliko jeste
 	povratna vrednost je pokazivac na trazeni element.
 */
-List* ListElementAt(int index, List* head)
+List* ListElementAt(char *naziv, List* head)
 {
+	char str[50] = "";
+	strcpy(str, naziv);
 	if (ListCount(head) > 0) {
 		List* temp = head;
 
-		while (temp->num != index) {
+		while (temp != NULL) {
+			if (temp->queuepair->nazivreda != str)
+			{
+				return temp;
+			}
 			temp = temp->next;
 		}
-		return temp;
+		return NULL;
 	}
 	return NULL;
 }
+
 void Select(SOCKET socket, bool read) {
 	while (true) {
 		// Initialize select parameters
@@ -301,19 +310,40 @@ void Select(SOCKET socket, bool read) {
 	}
 }
 
-DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
+DWORD WINAPI ClientServerCommunicateThread(LPVOID lpParam)
 {
 
-}
+	printf("ClientServ Thread\n");
+	int nDataLength;
+	char* buffer = (char*)calloc(1024, sizeof(char));
+	//ThreadParams* socket = (ThreadParams*)lpParam;
+	char* naziv = (char*)lpParam;
+	List* el = ListElementAt(naziv, lista);
+	//printf("%s", el->queuepair->nazivreda);
+	Select(el->s, true);
 
+	
+	while (true)
+	{
+		while ((nDataLength = recv(el->s, buffer, sizeof(buffer), 0)) > 0) {
+			if (buffer != "exit")
+			{
+				printf("Client with thread ID: %d, Sent: %s, to Queue: %s", el->threadID, buffer, el->queuepair->nazivreda);
+				putchar('\n');
+				EnterCriticalSection(&cs);
+				enq(el->queuepair->queuesendtoserv, buffer);
+				LeaveCriticalSection(&cs);
+			}
+		}
+		if (buffer == "exit")
+			break;
+	}
 
-DWORD WINAPI ServerCommunicateThread(LPVOID lpParam)
-{
-	int iResult = 0;
-	int idserv = *((int*)lpParam);
-	free(lpParam);
-	char* buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
-	int* pok = (int*)buffer;
+	//int iResult = 0;
+	//int idserv = *((int*)lpParam);
+	//free(lpParam);
+	//char* buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
+	//int* pok = (int*)buffer;
 	//List* servis = ListElementAt(idserv, listservicehead);
 
 	//while (true)
@@ -353,5 +383,51 @@ DWORD WINAPI ServerCommunicateThread(LPVOID lpParam)
 	//}
 
 	free(buffer);
-	return 0;
+	return NULL;
+}
+
+
+DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
+{
+	ThreadParams* socket = (ThreadParams*)lpParam;
+	int nDataLength;
+
+	char myString[] = "";
+	char* buffer = (char*)calloc(1024, sizeof(char));
+	int iResult = 0;
+
+	iResult = recv(socket->clientsocket, buffer, DEFAULT_BUFLEN, 0);
+	socket->naziv = buffer;
+	printf("%s", buffer);
+	
+	List* el = ListElementAt(buffer, lista);
+	if (el != NULL)
+	{
+		el->s = socket->clientsocket;
+
+		el->ready = 1;
+		HANDLE handle1;
+		DWORD dw1;
+		handle1 = CreateThread(NULL, 0, &ClientServerCommunicateThread, (LPVOID)socket, 0, &dw1);
+		el->clienth = handle1;
+		el->threadID = dw1;
+	}
+	else
+	{
+		HANDLE handle;
+		DWORD dw;
+		handle = CreateThread(NULL, 0, &ClientServerCommunicateThread, (LPVOID)socket->naziv, 0, &dw);
+		ListAdd(buffer, socket->clientsocket, dw, handle, &lista);
+	}
+
+	unsigned long int nonBlockingMode = 1;
+	iResult = ioctlsocket(socket->clientsocket, FIONBIO, &nonBlockingMode);
+
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
+		return 1;
+	}
+
+	return NULL;
 }

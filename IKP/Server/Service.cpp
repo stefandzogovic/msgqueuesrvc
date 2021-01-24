@@ -14,9 +14,8 @@ int main()
 
 	extern CRITICAL_SECTION cs;
 	extern List* lista;
-	char c[] = "c string";
-	queuepair *qpr = queuePairCreate(c);
-	ListAdd(123, qpr, &lista);
+	//char c[] = "c string";
+	//ListAdd(c, )
 	int iResult;
 
 	int id = 0;
@@ -118,6 +117,8 @@ int main()
 			continue;
 		}
 		else {
+			unsigned long int nonBlockingMode = 0;
+			iResult = ioctlsocket(acceptedSocket, FIONBIO, &nonBlockingMode);
 			printf("Client Connected");
 			HANDLE hThread2;
 			DWORD dw2;
@@ -128,9 +129,15 @@ int main()
 			//int idservisatemp = htonl(idservisa);
 			//idservisatemp = htonl(idservisa);
 			//memcpy(idservisasend, &(idservisatemp), 4);
-			iResult = send(acceptedSocket, queuepairnames, strlen(queuepairnames), 0);
+			if(queuepairnames != NULL)
+				iResult = send(acceptedSocket, queuepairnames, strlen(queuepairnames), 0);
+			else
+				iResult = send(acceptedSocket, "", 1, 0);
+
 			//*param = idservisa;
-			hThread2 = CreateThread(NULL, 0, &ClientChooseQueuePair, 0, 0, &dw2);
+			ThreadParams* p = (ThreadParams*)malloc(sizeof(ThreadParams));
+			p->clientsocket = acceptedSocket;
+			hThread2 = CreateThread(NULL, 0, &ClientChooseQueuePair, (LPVOID)p, 0, &dw2);
 			//ListAdd(idservisa, acceptedSocket, dw2, hThread2, &listservicehead);
 
 			//idservisa++;

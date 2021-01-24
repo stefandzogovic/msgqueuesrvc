@@ -23,7 +23,6 @@ typedef struct queuepair
 {
 	int idclienta;
 	char* nazivreda;
-	HANDLE handle;
 	int shutdown;
 	struct queue* queuesendtoserv;
 	struct queue* queuerecvfromserv;
@@ -35,16 +34,20 @@ typedef struct List
 	SOCKET s;
 	DWORD threadID;
 	HANDLE clienth;
-
-	int brojizabranihservisa;
+	int ready;
 	struct queuepair* queuepair;
 	struct List* next;
 } List;
 
+typedef struct LhreadParams {
+	SOCKET clientsocket;
+	char* naziv;
+}ThreadParams;
+
 char* GetQueuePairNames(List* lista);
 int queueEmpty(const struct queue* q);
-List* ListElementAt(int index, List* head);
-void ListAdd(int number, queuepair *qpr, List** head);
+List* ListElementAt(char naziv[], List* head);
+void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head);
 int ListCount(List* head);
 void ClientShutdown(List* client);
 void queuePrint(struct queue* q);
