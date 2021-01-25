@@ -43,6 +43,22 @@ DWORD WINAPI ClientSendData(LPVOID lpParam)
 		printf("Send something: ");
 		(void)scanf("%s", inputText);
 		iResult = send(connectSocket, inputText, strnlen_s(inputText, sizeof(inputText)), 0);
-
 	}
+	return NULL;
 }
+
+DWORD WINAPI ClientRecvData(LPVOID lpParam)
+{
+	int iResult;
+	while (true)
+	{
+		iResult = recv(connectSocket, buffer, DEFAULT_BUFLEN, 0);
+		if (iResult > 0)
+		{
+			printf("\nRecieved:%s", buffer);
+
+		}
+	}
+	return NULL;
+}
+

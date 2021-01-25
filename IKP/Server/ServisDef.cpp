@@ -2,6 +2,8 @@
 
 CRITICAL_SECTION cs; //Globalna promenljiva, kriticna sekcija
 List* lista = NULL; //lista za paroveredova
+SOCKET serverSocket = INVALID_SOCKET;
+
 
 bool InitializeWindowsSockets()
 {
@@ -15,7 +17,46 @@ bool InitializeWindowsSockets()
 	return true;
 }
 
-struct queue* queueCreate()
+DWORD WINAPI SendQueueThread(LPVOID lpParam)
+{
+	char* c = (char*)lpParam;
+	List* el = ListElementAt(c, lista);
+	char* poruka = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
+	while (true)
+	{
+		if (!queueEmpty(el->queuepair->queuesendtoserv))
+		{
+			EnterCriticalSection(&cs);
+			poruka = deq2(el->queuepair->queuesendtoserv, poruka);
+			LeaveCriticalSection(&cs);
+			//printf("poruka: %s", poruka);
+		}
+		Sleep(15);
+	}
+	return NULL;
+}
+
+DWORD WINAPI RecvQueueThread(LPVOID lpParam)
+{
+	char* c = (char*)lpParam;
+	List* el = ListElementAt(c, lista);
+	char* poruka = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
+	int iResult;
+	while (true)
+	{
+		if (!queueEmpty(el->queuepair->queuerecvfromserv))
+		{
+			EnterCriticalSection(&cs);
+			poruka = deq2(el->queuepair->queuerecvfromserv, poruka);
+			LeaveCriticalSection(&cs);
+			iResult = send(el->s, poruka, strlen(poruka), 0);
+		}
+		Sleep(15);
+	}
+	return NULL;
+}
+
+struct queue* queueCreate(int sw, char* naziv)
 {
 
 	struct queue* q;
@@ -23,27 +64,21 @@ struct queue* queueCreate()
 	q = (queue*)malloc(sizeof(struct queue));
 
 	q->head = q->tail = 0;
+
+	if (sw == 0)
+	{
+		q->h = CreateThread(NULL, 0, &SendQueueThread, (LPVOID)naziv, 0, &q->dword);
+	}
+	else
+	{
+		q->h = CreateThread(NULL, 0, &RecvQueueThread, (LPVOID)naziv, 0, &q->dword);
+	}
 	return q;
 }
 /*
 	Funkcija za kreiranje parova redova, za odgovarajuci servis. Inicijalno su sva polja postavljena na nule, ili
 	NULL (respektivno).
 */
-struct queuepair* queuePairCreate()
-{
-
-	struct queuepair* q;
-
-	q = (queuepair*)malloc(sizeof(struct queuepair));
-
-	q->nazivreda = NULL;
-	q->idclienta = 0;
-	q->shutdown = 0;
-	q->queuerecvfromserv = NULL;
-	q->queuesendtoserv = NULL;
-	q->handle = 0;
-	return q;
-}
 
 struct queuepair* queuePairCreate(char* naziv)
 {
@@ -55,9 +90,13 @@ struct queuepair* queuePairCreate(char* naziv)
 	q->nazivreda = naziv;
 	q->idclienta = 0;
 	q->shutdown = 0;
-	q->queuerecvfromserv = queueCreate();
-	q->queuesendtoserv = queueCreate();
-	q->handle = 0;
+	q->queuesendtoserv = queueCreate(0, q->nazivreda);
+	q->queuerecvfromserv = queueCreate(1, q->nazivreda);
+	char* niz = (char*)malloc(4);
+	//char niz2[] = "123";
+	//memcpy(niz, niz2, 4);
+	//enq(q->queuerecvfromserv, niz);
+	//q->handle = 0;
 	return q;
 }
 
@@ -116,14 +155,10 @@ char* deq2(struct queue* q, char* poruka)
 	assert(!queueEmpty(q));
 
 	memcpy(poruka, q->head->value, DEFAULT_BUFLEN);
-	//poruka = q->head->value;
-
 
 	/* patch out first element */
 	e = q->head;
 	q->head = e->next;
-	//char *temp_por = poruka;
-	//temp_por = temp_por + (NUMBER_OF_SERVICES + 2) * 4;
 
 	free(e);
 
@@ -172,13 +207,14 @@ void ListAdd(char *c, SOCKET s, DWORD id, HANDLE h, List** head)
 	List* el;
 	el = (List*)malloc(sizeof(List));
 	el->num = 0;
-	queuepair* qpr = queuePairCreate(c);
+	queuepair* qpr = queuePairCreate (c);
 
 	el->s = s;
 	el->threadID = id;
 	el->queuepair = qpr;
 	el->clienth = h;
 	el->next = NULL;
+	el->ready = 1;
 
 	if (*head == NULL) {
 		*head = el;
@@ -277,6 +313,15 @@ List* ListElementAt(char *naziv, List* head)
 	return NULL;
 }
 
+/*
+	Funkcija select omogucava pracenje stanja pisanja, citanja, i gresaka na jednom ili vise soketa.
+	Parametri funkcije su soket koji se obradjuje i promenljiva read; u slucaju da se proverava mogucnost citanja
+	ovaj parametar ce biti postavljen na true (operacije recv, recvfrom, accept, close);
+	ukoliko je taj parametar false vrsi se provera mogucnosti pisanja (operacije send, sendto, connect).
+	U while petlji funkcije vrsi se inicijalizacija seta, dodavanje desktriptora soketa u set, podesavanje
+	maksimalnog dozvoljenog vremena koje ce funkcija select cekati da se neki od dogadjaja desi, i na kraju
+	pozivanje implementirane funkcije select sa odgovarajucim parametrima, u zavisnosti da li se podaci salju ili primaju.
+*/
 void Select(SOCKET socket, bool read) {
 	while (true) {
 		// Initialize select parameters
@@ -328,7 +373,7 @@ DWORD WINAPI ClientServerCommunicateThread(LPVOID lpParam)
 		while ((nDataLength = recv(el->s, buffer, sizeof(buffer), 0)) > 0) {
 			if (buffer != "exit")
 			{
-				printf("Client with thread ID: %d, Sent: %s, to Queue: %s", el->threadID, buffer, el->queuepair->nazivreda);
+				printf("Client with thread ID: %d, Sent: %s, to QueuePair: %s", el->threadID, buffer, el->queuepair->nazivreda);
 				putchar('\n');
 				EnterCriticalSection(&cs);
 				enq(el->queuepair->queuesendtoserv, buffer);
@@ -353,7 +398,7 @@ DWORD WINAPI ClientServerCommunicateThread(LPVOID lpParam)
 	//		if (servis->ready == 1)
 	//		{
 	//			SOCKET socket = servis->s;
-	//			Select(socket, true);
+	//			Select(socket, true);s
 
 	//			iResult = recv(socket, buffer, DEFAULT_BUFLEN, 0);
 	//			if (iResult > 0)
@@ -408,7 +453,7 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 		el->ready = 1;
 		HANDLE handle1;
 		DWORD dw1;
-		handle1 = CreateThread(NULL, 0, &ClientServerCommunicateThread, (LPVOID)socket, 0, &dw1);
+		handle1 = CreateThread(NULL, 0, &ClientServerCommunicateThread, (LPVOID)socket->naziv, 0, &dw1);
 		el->clienth = handle1;
 		el->threadID = dw1;
 	}
@@ -431,3 +476,37 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 
 	return NULL;
 }
+
+DWORD WINAPI ServerToServer1(LPVOID lpParam)
+{
+	printf("1");
+	ThreadParams* tp = (ThreadParams*)lpParam;
+	int iResult;
+	while (true)
+	{
+		char* queuepairnames = GetQueuePairNames(lista);
+		if (queuepairnames != NULL)
+			iResult = send(tp->clientsocket, queuepairnames, strlen(queuepairnames), 0);
+		else
+			iResult = send(tp->clientsocket, "", 1, 0);
+		Sleep(5000);
+	}
+	return NULL;
+}
+
+
+DWORD WINAPI ServerToServer2(LPVOID lpParam)
+{
+	char buffer[DEFAULT_BUFLEN];
+
+	printf("2");
+	ThreadParams* tp = (ThreadParams*)lpParam;
+	int iResult;
+	Select(tp->clientsocket, 1);
+	while (true)
+	{
+		iResult = recv(tp->clientsocket, buffer, DEFAULT_BUFLEN, 0);
+	}
+	return NULL;
+}
+

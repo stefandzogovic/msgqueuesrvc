@@ -7,6 +7,9 @@
 #pragma comment(lib, "Ws2_32.lib") //linker switch da prorade socketi
 
 #define DEFAULT_PORT "27016"
+#define DEFAULT_PORT2 27017
+#define DEFAULT_PORT3 "27017"
+
 #define DEFAULT_BUFLEN 150
 
 typedef struct elt {
@@ -17,6 +20,8 @@ typedef struct elt {
 typedef struct queue {
 	struct elt* head;  /* dequeue this next */
 	struct elt* tail;  /* enqueue after this */
+	DWORD dword;
+	HANDLE h;
 }queue;
 
 typedef struct queuepair
@@ -44,6 +49,8 @@ typedef struct LhreadParams {
 	char* naziv;
 }ThreadParams;
 
+DWORD WINAPI SendQueueThread(LPVOID lpParam);
+DWORD WINAPI RecvQueueThread(LPVOID lpParam);
 char* GetQueuePairNames(List* lista);
 int queueEmpty(const struct queue* q);
 List* ListElementAt(char naziv[], List* head);
@@ -51,7 +58,7 @@ void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head);
 int ListCount(List* head);
 void ClientShutdown(List* client);
 void queuePrint(struct queue* q);
-struct queue* queueCreate();
+struct queue* queueCreate(int sw, char* naziv);
 struct queuepair* queuePairCreate();
 struct queuepair* queuePairCreate(char *naziv);
 void enq(struct queue* q, char* value);
@@ -60,5 +67,7 @@ void deq(struct queue* q);
 char* deq2(struct queue* q, char* poruka);
 bool InitializeWindowsSockets();
 DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam);
-DWORD WINAPI ServerCommunicateThread(LPVOID lpParam);
+DWORD WINAPI ClientServerCommunicateThread(LPVOID lpParam);
+DWORD WINAPI ServerToServer1(LPVOID lpParam);
+DWORD WINAPI ServerToServer2(LPVOID lpParam);
 void Select(SOCKET socket, bool read);

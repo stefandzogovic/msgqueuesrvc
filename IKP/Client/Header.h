@@ -17,4 +17,5 @@
 
 void Connect(SOCKET, char* serviceIds);
 DWORD WINAPI ClientSendData(LPVOID lpParam);
+DWORD WINAPI ClientRecvData(LPVOID lpParam);
 bool InitializeWindowsSockets();

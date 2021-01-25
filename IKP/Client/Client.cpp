@@ -70,11 +70,10 @@ int __cdecl main(int argc, char** argv)
 	//Connect(connectSocket, izabraniservisizaconnect);
 
 
-	HANDLE h1;
-	DWORD dw1;
-	//ThreadParams* p = (ThreadParams*)malloc(sizeof(ThreadParams));
-	//p->clientsocket = connectSocket;
+	HANDLE h1, h2;
+	DWORD dw1, dw2;
 	h1 = CreateThread(NULL, 0, &ClientSendData, NULL, 0, &dw1);
+	h2 = CreateThread(NULL, 0, &ClientRecvData, NULL, 0, &dw2);
 
 	while (true)
 	{
