@@ -266,7 +266,7 @@ int main()
 			Select(acceptedSocket, false);
 			char* queuepairnames = GetFreeQueuePairNames(lista);
 
-			if(queuepairnames != NULL)
+			if (queuepairnames != NULL)
 				iResult = send(acceptedSocket, queuepairnames, strlen(queuepairnames), 0);
 			else
 				iResult = send(acceptedSocket, "", 1, 0);

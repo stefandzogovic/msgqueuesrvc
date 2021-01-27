@@ -3,7 +3,7 @@
 CRITICAL_SECTION cs; //Globalna promenljiva, kriticna sekcija
 List* lista = NULL; //lista za paroveredova
 SOCKET serverSocket = INVALID_SOCKET;
-char* strings[] = {NULL};
+char* strings[] = { NULL };
 
 bool InitializeWindowsSockets()
 {
@@ -21,8 +21,7 @@ DWORD WINAPI SendQueueThread(LPVOID lpParam)
 {
 	char* c = (char*)lpParam;
 	List* el = ListElementAt(c, lista);
-	char* poruka = (char*)calloc(1024, sizeof(char));
-	int nDataLength;
+	char* poruka = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
 	while (true)
 	{
 		if (el != NULL)
@@ -32,38 +31,34 @@ DWORD WINAPI SendQueueThread(LPVOID lpParam)
 				EnterCriticalSection(&cs);
 				poruka = deq2(el->queuepair->queuesendtoserv, poruka);
 				LeaveCriticalSection(&cs);
-				Select(el->s, false);
-				nDataLength = send(serverSocket, poruka, strlen(poruka), 0);
+				//printf("poruka: %s", poruka);
 			}
 		}
-		Sleep(10);
+		Sleep(15);
 	}
-	free(poruka);
 	return NULL;
 }
 
 DWORD WINAPI RecvQueueThread(LPVOID lpParam)
 {
-	//printf("RecvQueueThread\n");
-	//int nDataLength;
-	//char* buffer = (char*)calloc(1024, sizeof(char));
-	//char* naziv = (char*)lpParam;
-	//List* el = ListElementAt(naziv, lista);
-	////printf("%s", el->queuepair->nazivreda);
-
-	//while (true)
-	//{
-	//	while (true) {
-
-	//		putchar('\n');
-	//		EnterCriticalSection(&cs);
-	//		buffer = deq2(el->queuepair->queuesendtoserv, buffer);
-	//		LeaveCriticalSection(&cs);
-	//		Select(el->s, false);
-	//		nDataLength = send(serverSocket, buffer, strlen(buffer), 0);
-	//	}
-	//}
-	//free(buffer);
+	char* c = (char*)lpParam;
+	List* el = ListElementAt(c, lista);
+	char* poruka = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
+	int iResult;
+	while (true)
+	{
+		if (el != NULL)
+		{
+			if (!queueEmpty(el->queuepair->queuerecvfromserv))
+			{
+				EnterCriticalSection(&cs);
+				poruka = deq2(el->queuepair->queuerecvfromserv, poruka);
+				LeaveCriticalSection(&cs);
+				iResult = send(el->s, poruka, strlen(poruka), 0);
+			}
+		}
+		Sleep(15);
+	}
 	return NULL;
 }
 
@@ -119,9 +114,8 @@ void enq(struct queue* q, char* value)
 
 	e = (elt*)malloc(sizeof(struct elt));
 	assert(e);
-	char* c = (char*)malloc(strlen(value) + 1);
-	strcpy(c, value);
-	e->value = c;
+
+	e->value = value;
 
 	/* Because I will be the tail, nobody is behind me */
 	e->next = 0;
@@ -166,7 +160,7 @@ char* deq2(struct queue* q, char* poruka)
 
 	assert(!queueEmpty(q));
 
-	strcpy(poruka, q->head->value);
+	memcpy(poruka, q->head->value, DEFAULT_BUFLEN);
 
 	/* patch out first element */
 	e = q->head;
@@ -213,7 +207,10 @@ void ParseQueuePairNames(char* c)
 	char* token = strtok(c, ",");
 
 	int br = 0;
-	strings[br] = token;
+
+	strings[br] = (char*)malloc(strlen(token));
+	strcpy(strings[br], token);
+
 	br++;
 
 	// loop through the string to extract all other tokens
@@ -227,7 +224,6 @@ void ParseQueuePairNames(char* c)
 		}
 	}
 }
-
 /*
 	Funkcija kao parametre prima ID servera (ili klijenta), soket za komunikaciju, i pokazivac na listu podignutih servera, ili klijenata.
 	Memorija se zauzima dinamicki za svaki novi elemenat liste upotrebom funkcije malloc,
@@ -317,8 +313,6 @@ char* GetAllQueuePairNames(List* head)
 			strcat(buffer, x);
 
 		}
-		memmove(buffer + 1, buffer, sizeof(buffer));
-		buffer[0] = 'X';
 		buffer[strlen(buffer) - 1] = 0; //na kraj se stavi \0 karakter da obrise poslednji zarez
 
 		return buffer;
@@ -394,12 +388,13 @@ void Select(SOCKET socket, bool read) {
 	}
 }
 
-DWORD WINAPI ServerEnqueueThread(LPVOID lpParam)
+DWORD WINAPI ClientServerCommunicateThread(LPVOID lpParam)
 {
 
 	printf("ClientServ Thread\n");
 	int nDataLength;
 	char* buffer = (char*)calloc(1024, sizeof(char));
+	//ThreadParams* socket = (ThreadParams*)lpParam;
 	char* naziv = (char*)lpParam;
 	List* el = ListElementAt(naziv, lista);
 	//printf("%s", el->queuepair->nazivreda);
@@ -408,7 +403,7 @@ DWORD WINAPI ServerEnqueueThread(LPVOID lpParam)
 
 	while (true)
 	{
-		while ((nDataLength = recv(el->s, buffer, 1024, 0)) > 0) {
+		while ((nDataLength = recv(el->s, buffer, sizeof(buffer), 0)) > 0) {
 			if (buffer != "exit")
 			{
 				printf("Client with thread ID: %d, Sent: %s, to QueuePair: %s", el->threadID, buffer, el->queuepair->nazivreda);
@@ -416,16 +411,58 @@ DWORD WINAPI ServerEnqueueThread(LPVOID lpParam)
 				EnterCriticalSection(&cs);
 				enq(el->queuepair->queuesendtoserv, buffer);
 				LeaveCriticalSection(&cs);
-				memset(buffer, 0, 1024);
 			}
 		}
 		if (buffer == "exit")
 			break;
 	}
+
+	//int iResult = 0;
+	//int idserv = *((int*)lpParam);
+	//free(lpParam);
+	//char* buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
+	//int* pok = (int*)buffer;
+	//List* servis = ListElementAt(idserv, listservicehead);
+
+	//while (true)
+	//{
+	//	if (servis->ugasi == 0)
+	//	{
+	//		if (servis->ready == 1)
+	//		{
+	//			SOCKET socket = servis->s;
+	//			Select(socket, true);s
+
+	//			iResult = recv(socket, buffer, DEFAULT_BUFLEN, 0);
+	//			if (iResult > 0)
+	//			{
+	//				int idklijenta = (int)(ntohl(*pok));
+
+	//				List* client = ListElementAt(idklijenta, listclienthead);
+	//				if (client->ready == 1)
+	//				{
+	//					for (int j = 0; j < client->brojizabranihservisa; j++)	
+	//					{
+	//						if (client->drajver->pokazivaci[j]->idservisa == servis->num)
+	//						{
+	//							EnterCriticalSection(&cs);
+	//							enq(client->drajver->pokazivaci[j]->queuerecvfromserv, buffer);
+	//							LeaveCriticalSection(&cs);
+	//							break;
+	//						}
+	//					}
+	//				}
+
+	//			}
+	//		}
+	//	}
+	//	else
+	//		break;
+	//}
+
 	free(buffer);
 	return NULL;
 }
-
 
 
 DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
@@ -437,9 +474,9 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 	char* buffer = (char*)calloc(1024, sizeof(char));
 	int iResult = 0;
 
-	iResult = recv(socket->clientsocket, buffer, sizeof(buffer), 0);
+	iResult = recv(socket->clientsocket, buffer, DEFAULT_BUFLEN, 0);
 	socket->naziv = buffer;
-	printf("\n%s", buffer);
+	printf("%s", buffer);
 
 	List* el = ListElementAt(buffer, lista);
 	if (el != NULL)
@@ -449,7 +486,7 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 		el->ready = 1;
 		HANDLE handle1;
 		DWORD dw1;
-		handle1 = CreateThread(NULL, 0, &ServerEnqueueThread, (LPVOID)socket->naziv, 0, &dw1);
+		handle1 = CreateThread(NULL, 0, &ClientServerCommunicateThread, (LPVOID)socket->naziv, 0, &dw1);
 		el->clienth = handle1;
 		el->threadID = dw1;
 	}
@@ -457,7 +494,7 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 	{
 		HANDLE handle;
 		DWORD dw;
-		handle = CreateThread(NULL, 0, &ServerEnqueueThread, (LPVOID)socket->naziv, 0, &dw);
+		handle = CreateThread(NULL, 0, &ClientServerCommunicateThread, (LPVOID)socket->naziv, 0, &dw);
 		ListAdd(buffer, socket->clientsocket, dw, handle, &lista);
 	}
 
@@ -475,8 +512,8 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 
 DWORD WINAPI ServerToServer1(LPVOID lpParam)
 {
-	char *buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
-	printf("ServerToServer1\n");
+	char buffer[DEFAULT_BUFLEN];
+	printf("1");
 	int iResult;
 	Select(serverSocket, 0);
 	while (true)
@@ -485,19 +522,10 @@ DWORD WINAPI ServerToServer1(LPVOID lpParam)
 		if (queuepairnames != NULL)
 			iResult = send(serverSocket, queuepairnames, strlen(queuepairnames), 0);
 		else
-			iResult = send(serverSocket, "", 1, 0);
-		free(queuepairnames);
+			iResult = send(serverSocket, ".i.", 4, 0);
 		Select(serverSocket, 1);
 		iResult = recv(serverSocket, buffer, DEFAULT_BUFLEN, 0);
-
-		if (strlen(buffer) == 0)
-		{
-			printf("nista");
-		}
-		else
-		{
-			ParseQueuePairNames(buffer);
-		}
+		printf("%s", buffer);
 
 		Sleep(5000);
 	}
@@ -519,9 +547,14 @@ DWORD WINAPI ServerToServer2(LPVOID lpParam)
 		{
 			printf("nista");
 		}
+		else if (buffer[0] == 'X')
+		{
+			memmove(buffer, buffer + 1, strlen(buffer));
+			ParseQueuePairNames(buffer);
+		}
 		else
 		{
-			ParseQueuePairNames(buffer);
+			printf("%s", buffer);
 		}
 		Select(serverSocket, 0);
 		char* queuepairnames = GetAllQueuePairNames(lista);
@@ -529,6 +562,8 @@ DWORD WINAPI ServerToServer2(LPVOID lpParam)
 			iResult = send(serverSocket, queuepairnames, strlen(queuepairnames), 0);
 		else
 			iResult = send(serverSocket, "", 1, 0);
+
+		memset(buffer, 0, DEFAULT_BUFLEN);
 	}
 	return NULL;
 }

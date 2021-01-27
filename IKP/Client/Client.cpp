@@ -57,18 +57,16 @@ int __cdecl main(int argc, char** argv)
 
 	printf("Choose commoncuation channel: \n");
 	char string[1000] = "";
-	(void)scanf("%s", string);
+	(void)fgets(string, 999, stdin);
+
+	if ((strlen(string) > 0) && (string[strlen(string) - 1] == '\n'))
+		string[strlen(string) - 1] = '\0';
 
 	iResult = send(connectSocket, string, strlen(string), 0);
 
 
 	unsigned long int nonBlockingMode = 1;
 	iResult = ioctlsocket(connectSocket, FIONBIO, &nonBlockingMode);
-
-   	//izabraniservisizaconnect = Menu(connectSocket, buffer);
-
-	//Connect(connectSocket, izabraniservisizaconnect);
-
 
 	HANDLE h1, h2;
 	DWORD dw1, dw2;

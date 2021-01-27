@@ -36,13 +36,15 @@ void Connect(SOCKET connectSocket, char* izabraniservisi)
 
 DWORD WINAPI ClientSendData(LPVOID lpParam)
 {
-	char inputText[30];
+	char* inputText = (char*)malloc(1024);
 	int iResult = 0;
 	while (true)
 	{
 		printf("Send something: ");
-		(void)scanf("%s", inputText);
-		iResult = send(connectSocket, inputText, strnlen_s(inputText, sizeof(inputText)), 0);
+		fgets(inputText, 1023, stdin);
+		if ((strlen(inputText) > 0) && (inputText[strlen(inputText) - 1] == '\n'))
+			inputText[strlen(inputText) - 1] = '\0';
+		iResult = send(connectSocket, inputText, strlen(inputText), 0);
 	}
 	return NULL;
 }
@@ -56,7 +58,6 @@ DWORD WINAPI ClientRecvData(LPVOID lpParam)
 		if (iResult > 0)
 		{
 			printf("\nRecieved:%s", buffer);
-
 		}
 	}
 	return NULL;

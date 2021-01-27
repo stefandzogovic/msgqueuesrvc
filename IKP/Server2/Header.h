@@ -6,7 +6,7 @@
 #pragma warning(disable:4996) //disejbluje warning taj
 #pragma comment(lib, "Ws2_32.lib") //linker switch da prorade socketi
 
-#define DEFAULT_PORT "27016"
+#define DEFAULT_PORT "27018"
 #define DEFAULT_PORT2 27019
 #define DEFAULT_PORT3 "27019"
 
@@ -61,16 +61,15 @@ void ClientShutdown(List* client);
 void queuePrint(struct queue* q);
 struct queue* queueCreate(int sw, char* naziv);
 struct queuepair* queuePairCreate();
-struct queuepair* queuePairCreate(char *naziv);
-void ParseQueuePairNames(char* buffer);
+struct queuepair* queuePairCreate(char* naziv);
+void ParseQueuePairNames(char *buffer);
 void enq(struct queue* q, char* value);
 void queueDestroy(struct queue* q);
 void deq(struct queue* q);
 char* deq2(struct queue* q, char* poruka);
 bool InitializeWindowsSockets();
 DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam);
-DWORD WINAPI ServerEnqueueThread(LPVOID lpParam);
-//DWORD WINAPI ServerDequeueThread(LPVOID lpParaml);
+DWORD WINAPI ClientServerCommunicateThread(LPVOID lpParam);
 DWORD WINAPI ServerToServer1(LPVOID lpParam);
 DWORD WINAPI ServerToServer2(LPVOID lpParam);
 void Select(SOCKET socket, bool read);
