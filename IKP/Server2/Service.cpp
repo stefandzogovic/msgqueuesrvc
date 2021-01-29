@@ -14,7 +14,11 @@ int main()
 
 	extern SOCKET serverSocket;
 
-
+	extern char* strings[MAX_QUEUEPAIRS];
+	for (int i = 0; i < MAX_QUEUEPAIRS; i++)
+	{
+		strings[i] = NULL;
+	}
 	extern CRITICAL_SECTION cs;
 	extern List* lista;
 	int iResult;
@@ -117,8 +121,8 @@ int main()
 			printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
 			return 1;
 		}
-#pragma endregion
 
+#pragma endregion
 
 		while (br == 0)
 		{
@@ -126,13 +130,13 @@ int main()
 			serverSocket = accept(listenSocket, NULL, NULL);
 			if (serverSocket != INVALID_SOCKET)
 			{
-				HANDLE h;
-				DWORD dw;
+				HANDLE h, h1;
+				DWORD dw, dw1;
 				h = CreateThread(NULL, 0, &ServerToServer1, (LPVOID)NULL, 0, &dw);
+				h1 = CreateThread(NULL, 0, &ServerToServer2, (LPVOID)NULL, 0, &dw1);
 				br++;
 			}
 		}
-
 	}
 	else
 	{
@@ -167,9 +171,10 @@ int main()
 		}
 		else
 		{
-			HANDLE h;
-			DWORD dw;
-			h = CreateThread(NULL, 0, &ServerToServer2, NULL, 0, &dw);
+			HANDLE h, h1;
+			DWORD dw, dw1;
+			h = CreateThread(NULL, 0, &ServerToServer1, (LPVOID)NULL, 0, &dw);
+			h1 = CreateThread(NULL, 0, &ServerToServer2, (LPVOID)NULL, 0, &dw1);
 		}
 	}
 	connectSocket = socket(AF_INET,
@@ -257,8 +262,6 @@ int main()
 			continue;
 		}
 		else {
-			unsigned long int nonBlockingMode = 0;
-			iResult = ioctlsocket(acceptedSocket, FIONBIO, &nonBlockingMode);
 			printf("Client Connected");
 			HANDLE hThread2;
 			DWORD dw2;

@@ -9,6 +9,7 @@
 #define DEFAULT_PORT "27016"
 #define DEFAULT_PORT2 27019
 #define DEFAULT_PORT3 "27019"
+#define MAX_QUEUEPAIRS 50
 
 #define DEFAULT_BUFLEN 15000
 
@@ -70,7 +71,7 @@ char* deq2(struct queue* q, char* poruka);
 bool InitializeWindowsSockets();
 DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam);
 DWORD WINAPI ServerEnqueueThread(LPVOID lpParam);
-//DWORD WINAPI ServerDequeueThread(LPVOID lpParaml);
+DWORD WINAPI ServerDequeueThread(LPVOID lpParaml);
 DWORD WINAPI ServerToServer1(LPVOID lpParam);
 DWORD WINAPI ServerToServer2(LPVOID lpParam);
 void Select(SOCKET socket, bool read);

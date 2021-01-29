@@ -6,11 +6,12 @@
 #pragma warning(disable:4996) //disejbluje warning taj
 #pragma comment(lib, "Ws2_32.lib") //linker switch da prorade socketi
 
-#define DEFAULT_PORT "27018"
+#define DEFAULT_PORT "28018"
 #define DEFAULT_PORT2 27019
 #define DEFAULT_PORT3 "27019"
 
 #define DEFAULT_BUFLEN 15000
+#define MAX_QUEUEPAIRS 50
 
 typedef struct elt {
 	struct elt* next;
