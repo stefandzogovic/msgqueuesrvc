@@ -59,6 +59,7 @@ DWORD WINAPI ClientRecvData(LPVOID lpParam)
 		{
 			printf("\nRecieved:%s", buffer);
 		}
+		memset(buffer, 0, strlen(buffer));
 	}
 	return NULL;
 }

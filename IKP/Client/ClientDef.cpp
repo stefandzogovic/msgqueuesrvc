@@ -22,7 +22,7 @@ void Connect(SOCKET connectSocket, char* izabraniservisi)
 	//int iResult = 0;
 	//iResult = send(connectSocket, izabraniservisi, brojservisa * 4, 0); //(brojservisa + 1) * 4
 
-	//if (iResult == SOCKET_ERROR)
+	//if (iResult == SOCKET_ERROR)x
 	//{
 	//	int i = 0;
 	//	printf("send failed with error: %d\n", WSAGetLastError());
@@ -59,6 +59,7 @@ DWORD WINAPI ClientRecvData(LPVOID lpParam)
 		{
 			printf("\nRecieved:%s", buffer);
 		}
+		memset(buffer, 0, strlen(buffer));
 	}
 	return NULL;
 }

@@ -9,7 +9,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 #define DEFAULT_BUFLEN 150
-#define DEFAULT_PORT 27016
+#define DEFAULT_PORT 27013
 
 //typedef struct LhreadParams {
 //	SOCKET clientsocket;

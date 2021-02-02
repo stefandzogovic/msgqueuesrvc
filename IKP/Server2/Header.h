@@ -56,7 +56,7 @@ char* GetFreeQueuePairNames(List* lista);
 char* GetAllQueuePairNames(List* head);
 int queueEmpty(const struct queue* q);
 List* ListElementAt(char naziv[], List* head);
-void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head);
+void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head, int ready);
 int ListCount(List* head);
 void ClientShutdown(List* client);
 void queuePrint(struct queue* q);

@@ -20,10 +20,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Service.cpp">
+    <ClCompile Include="ServiceDef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ServiceDef.cpp">
+    <ClCompile Include="Service.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

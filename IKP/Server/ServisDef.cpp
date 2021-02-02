@@ -3,7 +3,7 @@
 CRITICAL_SECTION cs; //Globalna promenljiva, kriticna sekcija
 List* lista = NULL; //lista za paroveredova
 SOCKET serverSocket = INVALID_SOCKET;
-char* strings[MAX_QUEUEPAIRS] = { NULL };
+char* strings[MAX_QUEUEPAIRS] = { NULL }; //ovde ce se nalaziti svi nazivi redova sa drugog servera
 
 bool InitializeWindowsSockets()
 {
@@ -80,6 +80,12 @@ DWORD WINAPI RecvQueueThread(LPVOID lpParam)
 				LeaveCriticalSection(&cs);
 				Select(el->s, false);
 				nDataLength = send(el->s, poruka, strlen(poruka), 0);
+				if (nDataLength == -1)
+				{
+					printf("Disconected client");
+					el->ready = 0;
+					enq(el->queuepair->queuerecvfromserv, poruka);
+				}
 				memset(poruka, 0, strlen(poruka));
 			}
 		}
@@ -232,11 +238,11 @@ void queuepairDestroy(struct queuepair* q)
 void ParseQueuePairNames(char* c)
 {
 
-	char* token = strtok(c, ",");
+	char* token = strtok(c, ","); //token sa kojim splitujes string  u memoriji ----  asdiofoi00iowjqrqw00disja0
 
 	int br = 0;
 
-	if (strings[br] == NULL)
+	if (strings[br] == NULL) //ovo je za prvi element i stavi ga u globlan niz naziva redova (strings promenljiva)
 	{
 		strings[br] = (char*)malloc(strlen(token));
 		strcpy(strings[br], token);
@@ -245,7 +251,7 @@ void ParseQueuePairNames(char* c)
 
 	while (token != NULL) {
 		printf("%s\n", token);
-		token = strtok(NULL, ",");
+		token = strtok(NULL, ","); //uzme sledeci splitovan string
 		if (token != NULL)
 		{
 			if (strings[br] == NULL)
@@ -258,18 +264,39 @@ void ParseQueuePairNames(char* c)
 	}
 }
 
-/*
-	Funkcija kao parametre prima ID servera (ili klijenta), soket za komunikaciju, i pokazivac na listu podignutih servera, ili klijenata.
-	Memorija se zauzima dinamicki za svaki novi elemenat liste upotrebom funkcije malloc,
-	i redom se popunjavaju polja novog elementa liste, kao i povezivanje novog elementa sa starim (postavljanje na kraj),
-	ili njegovo postavljanje na pocetak liste.
-	Soket za komunikaciju se koristi da bi proksi znao kojem klijentu/serveru prosledjuje poruke.
-*/
-void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head)
+int ParseString(char* c, char* out[])
+{
+	char* token = strtok(c, ",");
+
+	int br = 0;
+
+
+	out[br] = (char*)malloc(strlen(token));
+	strcpy(out[br], token);
+
+	br++;
+
+	while (token != NULL) {
+		printf("%s\n", token);
+		token = strtok(NULL, ",");
+		if (token != NULL)
+		{
+
+			out[br] = (char*)malloc(strlen(token));
+			strcpy(out[br], token);
+
+			br++;
+		}
+	}
+
+	return br;
+}
+
+void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head, int ready)
 {
 	List* el;
 	el = (List*)malloc(sizeof(List));
-	el->num = 0;
+	el->num = 0; //ne koristim
 	queuepair* qpr = queuePairCreate(c);
 
 	el->s = s;
@@ -277,19 +304,20 @@ void ListAdd(char* c, SOCKET s, DWORD id, HANDLE h, List** head)
 	el->queuepair = qpr;
 	el->clienth = h;
 	el->next = NULL;
-	el->ready = 1;
+	el->ready = ready;
 
-	if (*head == NULL) {
+	if (*head == NULL) { //za prvi elemenat 
 		*head = el;
 	}
 	else {
-		List* temp = *head;
+		List* temp = *head; // za svaki naredni 
 		while (temp->next != NULL) {
 			temp = temp->next;
 		}
 		temp->next = el;
 	}
 }
+
 
 int ListCount(List* head)
 {
@@ -309,11 +337,13 @@ char* GetAllQueuePairNames(List* head)
 	int br = 1;
 	if (temp != NULL)
 
+		//123 456 789
+		
 		//QWERTTY,LOL\0
 	{
 		char* buffer = (char*)calloc(strlen(temp->queuepair->nazivreda) + 2, sizeof(char));
 		strcpy(buffer, temp->queuepair->nazivreda);
-		char zarez[2] = ","; //posle svakog naziva se stavlja zarez
+		char zarez[2] = ","; //posle svakog naziva se stavlja zarez niz od 2 karaktera jer ima \0 ,\0
 		memcpy(buffer + strlen(buffer), zarez, 2);
 		while (temp->next != NULL)
 		{
@@ -359,15 +389,6 @@ List* ListElementAt(char* naziv, List* head)
 	return NULL;
 }
 
-/*
-	Funkcija select omogucava pracenje stanja pisanja, citanja, i gresaka na jednom ili vise soketa.
-	Parametri funkcije su soket koji se obradjuje i promenljiva read; u slucaju da se proverava mogucnost citanja
-	ovaj parametar ce biti postavljen na true (operacije recv, recvfrom, accept, close);
-	ukoliko je taj parametar false vrsi se provera mogucnosti pisanja (operacije send, sendto, connect).
-	U while petlji funkcije vrsi se inicijalizacija seta, dodavanje desktriptora soketa u set, podesavanje
-	maksimalnog dozvoljenog vremena koje ce funkcija select cekati da se neki od dogadjaja desi, i na kraju
-	pozivanje implementirane funkcije select sa odgovarajucim parametrima, u zavisnosti da li se podaci salju ili primaju.
-*/
 void Select(SOCKET socket, bool read) {
 	while (true) {
 		// Initialize select parameters
@@ -419,8 +440,8 @@ DWORD WINAPI ServerEnqueueThread(LPVOID lpParam)
 		else
 		{
 			Select(el->s, true);
-			while ((nDataLength = recv(el->s, buffer, 1024, 0)) > 0) {
-				if (buffer != "exit")
+			while ((nDataLength = recv(el->s, buffer, 1023, 0)) > 0) {
+				if (strcmp(buffer, "exit") != 0)
 				{
 					printf("Client with thread ID: %d, Sent: %s, to QueuePair: %s", el->threadID, buffer, el->queuepair->nazivreda);
 					putchar('\n');
@@ -429,10 +450,13 @@ DWORD WINAPI ServerEnqueueThread(LPVOID lpParam)
 					LeaveCriticalSection(&cs);
 					memset(buffer, 0, 1024);
 				}
+				else
+				{
+					printf("exited");
+					el->ready = 0;
+				}
 			}
 		}
-		if (buffer == "exit")
-			break;
 	}
 	free(buffer);
 	return NULL;
@@ -442,14 +466,14 @@ DWORD WINAPI ServerEnqueueThread(LPVOID lpParam)
 
 DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 {
-	ThreadParams* socket = (ThreadParams*)lpParam;
+	ThreadParams* socket = (ThreadParams*)lpParam; //castujem lpparam u threadparams strukturu da bih dobio socket klijenta
 	int nDataLength;
 
 	char myString[] = "";
 	char* buffer = (char*)calloc(1024, sizeof(char));
 	int iResult = 0;
 
-	unsigned long int nonBlockingMode = 0;
+	unsigned long int nonBlockingMode = 0; //blokirajuci rezim, zablokirace clientsocket na RECV funkciji
 	iResult = ioctlsocket(socket->clientsocket, FIONBIO, &nonBlockingMode);
 
 	iResult = recv(socket->clientsocket, buffer, 1024, 0);
@@ -459,21 +483,29 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 	List* el = ListElementAt(buffer, lista);
 	if (el != NULL)
 	{
-		el->s = socket->clientsocket;
+		if (el->ready == 0)
+		{
 
-		el->ready = 1;
-		HANDLE handle1;
-		DWORD dw1;
-		handle1 = CreateThread(NULL, 0, &ServerEnqueueThread, (LPVOID)socket->naziv, 0, &dw1);
-		el->clienth = handle1;
-		el->threadID = dw1;
+			el->s = socket->clientsocket;
+
+			el->ready = 1;
+			HANDLE handle1;
+			DWORD dw1;
+			handle1 = CreateThread(NULL, 0, &ServerEnqueueThread, (LPVOID)socket->naziv, 0, &dw1);
+			el->clienth = handle1;
+			el->threadID = dw1;
+		}
+		else
+		{
+			printf("already taken");
+		}
 	}
 	else
 	{
 		HANDLE handle;
 		DWORD dw;
 		handle = CreateThread(NULL, 0, &ServerEnqueueThread, (LPVOID)socket->naziv, 0, &dw);
-		ListAdd(buffer, socket->clientsocket, dw, handle, &lista);
+		ListAdd(buffer, socket->clientsocket, dw, handle, &lista, 1);
 	}
 
 	nonBlockingMode = 1;
@@ -489,7 +521,7 @@ DWORD WINAPI ClientChooseQueuePair(LPVOID lpParam)
 
 DWORD WINAPI ServerToServer1(LPVOID lpParam)
 {
-	char* buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
+	char* buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char)); //15000 bajta i stavi ih sve na 00 (\0)
 	printf("ServerToServer1\n");
 	int iResult;
 	while (true)
@@ -500,33 +532,6 @@ DWORD WINAPI ServerToServer1(LPVOID lpParam)
 			iResult = send(serverSocket, queuepairnames, strlen(queuepairnames), 0);
 		else
 			iResult = send(serverSocket, "", 1, 0);
-		////free(queuepairnames);
-		//Select(serverSocket, 1);
-		//iResult = recv(serverSocket, buffer, DEFAULT_BUFLEN, 0);
-		//if (strlen(buffer) == 0)
-		//{
-		//	printf("nista");
-		//}
-		//else if (buffer[0] == 'X')
-		//{
-		//	memmove(buffer, buffer + 1, strlen(buffer)); //zbog x-a da se obrise pomeri string u desno za 1
-		//	ParseQueuePairNames(buffer);
-		//}
-		//else
-		//{
-		//	//printf("%s\n", buffer);
-		//	char* token = strtok(buffer, ":");
-		//	token = strtok(NULL, ":");
-		//	//printf("%s", token);
-		//	List* el = ListElementAt(token, lista);
-		//	char* str = (char*)malloc(strlen(buffer));
-		//	strcpy(str, buffer);
-
-		//	EnterCriticalSection(&cs);
-		//	enq(el->queuepair->queuerecvfromserv, str);
-		//	LeaveCriticalSection(&cs);
-		//}
-		//memset(buffer, 0, strlen(buffer));
 		Sleep(5000);
 	}
 	return NULL;
@@ -535,8 +540,9 @@ DWORD WINAPI ServerToServer1(LPVOID lpParam)
 
 DWORD WINAPI ServerToServer2(LPVOID lpParam)
 {
-	char* buffer = (char*)calloc(1024, sizeof(char));
+	char* buffer = (char*)calloc(DEFAULT_BUFLEN, sizeof(char));
 	char* buffertemp;
+	char* parsedstrings[50];
 	//unsigned long int nonBlockingMode = 1;
 	printf("2");
 	int iResult;
@@ -546,7 +552,7 @@ DWORD WINAPI ServerToServer2(LPVOID lpParam)
 		Select(serverSocket, 1);
 
 		//printf("%s", strings[0]);
-		iResult = recv(serverSocket, buffer, 1023, 0);
+		iResult = recv(serverSocket, buffer, DEFAULT_BUFLEN, 0);
 		if (iResult > 0)
 		{
 
@@ -561,56 +567,26 @@ DWORD WINAPI ServerToServer2(LPVOID lpParam)
 			}
 			else
 			{
+				//nazivporuke:red	asdfasijofas:qwerty,qdajsaioda:qwerty,qrwqio:qwerty,
 				printf("Recv: %s", buffer);
-				buffertemp = (char*)malloc(strlen(buffer) + 1);
-				strcpy(buffertemp, buffer);
-				//printf("%s\n", buffer);
-				char* token = strtok(buffertemp, ",");
-				//token= strtok(NULL, ",");
-				char* tokentemp = (char*)malloc(strlen(token) + 1);
-				memcpy(tokentemp, buffertemp, strlen(token) + 1);
-				buffertemp = strtok(NULL, ",");
-				char* token2 = strtok(tokentemp, ":");
-				token2 = strtok(NULL, ":");
-				//printf("%s", token);
-				List* el = ListElementAt(token2, lista);
-				//token = strtok(NULL, ",");
-				//char* str = (char*)malloc(strlen(tokentemp) + 1);
-				//strcpy(str, tokentemp);
-
-				EnterCriticalSection(&cs);
-				enq(el->queuepair->queuerecvfromserv, tokentemp);
-				LeaveCriticalSection(&cs);
-				free(tokentemp);
-				while (buffertemp != NULL)
+				int brojac = ParseString(buffer, parsedstrings);
+				for (int i = 0; i < brojac; i++)
 				{
-					if (buffertemp != NULL)
-					{
-						char* tokentemp = (char*)malloc(strlen(buffertemp) + 1);
-						memcpy(tokentemp, buffertemp, strlen(buffertemp) + 1);
-						buffertemp = strtok(NULL, ",");
-						char* token2 = strtok(tokentemp, ":");
-						token2 = strtok(NULL, ":");
-						//printf("%s", token);
-						List* el = ListElementAt(token2, lista);
-						//token = strtok(NULL, ",");
-
-						EnterCriticalSection(&cs);
-						enq(el->queuepair->queuerecvfromserv, tokentemp);
-						LeaveCriticalSection(&cs);
-						free(tokentemp);
-					}
+					buffertemp = (char*)malloc(strlen(parsedstrings[i]) + 1);
+					strcpy(buffertemp, parsedstrings[i]);
+					char* token2 = strtok(buffertemp, ":");
+					token2 = strtok(NULL, ":");
+					List* el = ListElementAt(token2, lista);
+					EnterCriticalSection(&cs);
+					enq(el->queuepair->queuerecvfromserv, buffertemp);
+					LeaveCriticalSection(&cs);
 				}
-				free(buffertemp);
+				//token= strtok(NULL, ",");
+
 			}
 			memset(buffer, 0, strlen(buffer));
-
 		}
-		//char* queuepairnames = GetAllQueuePairNames(lista);
-		//if (queuepairnames != NULL)
-		//	iResult = send(serverSocket, queuepairnames, strlen(queuepairnames), 0);
-		//else
-		//	iResult = send(serverSocket, "", 1, 0);
 	}
+
 	return NULL;
 }

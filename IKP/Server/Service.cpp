@@ -34,14 +34,22 @@ int main()
 		return 1;
 	}
 
-
+	int x;
+	printf("Unesi broj parova redova: ");
+	scanf("%d", &x);
+	for (int i = 0; i < x; i++)
+	{
+		char* c = (char*)malloc(50);
+		printf("\nIme reda: ");
+		scanf("%s", c);
+		ListAdd(c, NULL, NULL, NULL, &lista, 0);
+	}
 	printf("Server initialized.\n\n");
 
 	printf("1. Listen for second server.\n");
 	printf("2. Connect to second server.\n");
-	int x;
 	int br = 0;
-	(void)scanf("%d", &x);
+	(void)scanf("%d", &x); //void je zbog warninga jer scanf ima neki return value
 #pragma region
 
 	if (x == 1)
@@ -265,7 +273,7 @@ int main()
 			printf("Client Connected");
 			HANDLE hThread2;
 			DWORD dw2;
-			int* param = (int*)malloc(sizeof(int));
+			//int* param = (int*)malloc(sizeof(int));
 			Select(acceptedSocket, false);
 			char* queuepairnames = GetFreeQueuePairNames(lista);
 
